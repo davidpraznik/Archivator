@@ -8,6 +8,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/davidpraznik/Archivator/releases/latest"><img src="https://img.shields.io/github/v/release/davidpraznik/Archivator?color=FC5159&label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-14.6%2B-FC5159" alt="macOS 14.6+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-FC5159" alt="MIT licence"></a>
 </p>
@@ -40,6 +41,16 @@ Extraction uses the system `tar` (libarchive) without the option that preserves 
 
 - macOS 14.6 or later (tested on macOS 27 only)
 - Xcode to build from source
+
+## Opening a downloaded build
+
+Builds from GitHub are not notarized, so macOS blocks the app on first launch. To open it:
+
+1. Try to open Archivator once and close the warning.
+2. Open **System Settings > Privacy & Security** and scroll to the bottom.
+3. Click **Open Anyway** next to the message about Archivator, then confirm.
+
+This is needed only once.
 
 ## Build
 
