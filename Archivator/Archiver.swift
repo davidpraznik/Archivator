@@ -5,6 +5,32 @@ import Foundation
 
 enum Archiver {
     struct Failure: Error { let message: String }
+    struct Cancelled: Error {}
+
+    // Preklic (Esc): ustavi tekoče orodje, nedokončan izhod pobriše obstoječi catch.
+    private final class JobState {
+        let lock = NSLock()
+        var process: Process?
+        var cancelled = false
+    }
+    private nonisolated static let job = JobState()
+
+    nonisolated static func beginJob() {
+        job.lock.lock(); job.cancelled = false; job.process = nil; job.lock.unlock()
+    }
+
+    nonisolated static var wasCancelled: Bool {
+        job.lock.lock(); defer { job.lock.unlock() }
+        return job.cancelled
+    }
+
+    nonisolated static func cancel() {
+        job.lock.lock()
+        job.cancelled = true
+        let p = job.process
+        job.lock.unlock()
+        if let p = p, p.isRunning { p.terminate() }
+    }
 
     nonisolated static let archiveExtensions: Set<String> =
         ["zip", "7z", "tar", "tgz", "gz", "bz2", "tbz2", "xz", "txz", "rar"]
@@ -57,9 +83,18 @@ enum Archiver {
         let err = Pipe()
         p.standardError = err
         p.standardOutput = FileHandle.nullDevice
+        job.lock.lock()
+        if job.cancelled { job.lock.unlock(); throw Cancelled() }
         try p.run()
+        job.process = p
+        job.lock.unlock()
         let data = err.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
+        job.lock.lock()
+        job.process = nil
+        let wasCancelled = job.cancelled
+        job.lock.unlock()
+        if wasCancelled { throw Cancelled() }
         if p.terminationStatus != 0 {
             let text = String(data: data, encoding: .utf8) ?? ""
             throw Failure(message: "\(executable) exit \(p.terminationStatus): \(text)")
@@ -110,6 +145,7 @@ enum Archiver {
     }
 
     nonisolated static func log(_ error: Error) {
+        if error is Cancelled { return }
         if let f = error as? Failure {
             NSLog("Archivator error: %@", f.message)
         } else {

@@ -180,12 +180,20 @@ struct WheelView: View {
             Circle()
                 .fill(p.wedge)
                 .frame(width: 112 * u, height: 112 * u)
-            Text(centerText)
-                .multilineTextAlignment(.center)
-                .lineSpacing(1 * u)
-                .font(inter(hint == nil ? 14 * u : 11 * u))
-                .tracking(hint == nil ? 0 : 0.88 * u)
-                .foregroundStyle(hint == nil ? p.text : p.textDim)
+            VStack(spacing: 4 * u) {
+                Text(centerText)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(1 * u)
+                    .font(inter(hint == nil ? 14 * u : 11 * u))
+                    .tracking(hint == nil ? 0 : 0.88 * u)
+                    .foregroundStyle(hint == nil ? p.text : p.textDim)
+                if model.busy && model.chosen != nil {
+                    Text("ESC TO CANCEL")
+                        .font(inter(9 * u))
+                        .tracking(0.64 * u)
+                        .foregroundStyle(p.textDim)
+                }
+            }
         }
         .frame(width: size, height: size)
         .onDrop(of: [.fileURL], delegate: WheelDropDelegate(
@@ -234,6 +242,7 @@ struct WheelView: View {
     }
 
     private func start(_ urls: [URL], _ target: Target, _ folder: URL?) {
+        Archiver.beginJob()
         DispatchQueue.global(qos: .userInitiated).async {
             var ok = 0
             var jobs = 0
@@ -249,6 +258,7 @@ struct WheelView: View {
             case .extractHere, .extractTo:
                 jobs = urls.count
                 for (i, url) in urls.enumerated() {
+                    if Archiver.wasCancelled { break }
                     do {
                         try Archiver.extract(url, into: folder)
                         ok += 1
@@ -265,7 +275,9 @@ struct WheelView: View {
                 }
             }
             DispatchQueue.main.async {
-                if ok == jobs {
+                if Archiver.wasCancelled {
+                    model.message = "CANCELED"
+                } else if ok == jobs {
                     model.message = Self.cheers.randomElement() ?? "DONE!"
                 } else if ok == 0 {
                     model.message = "FAILED"

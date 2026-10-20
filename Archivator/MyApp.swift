@@ -71,6 +71,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func tick() {
+        // Esc med delom prekliče posel (stanje tipke, brez posebnih dovoljenj)
+        if model.busy, CGEventSource.keyState(.combinedSessionState, key: 0x35) {
+            Archiver.cancel()
+        }
         let pb = NSPasteboard(name: .drag)
         let pressed = (NSEvent.pressedMouseButtons & 1) != 0
 
