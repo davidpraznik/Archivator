@@ -5,14 +5,31 @@ import AppKit
 struct ArchivatorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    @ObservedObject private var updates = UpdateChecker.shared
+
     var body: some Scene {
         MenuBarExtra {
+            if let v = updates.available, let url = updates.releaseURL {
+                Button("Update available: \(v)…") {
+                    NSWorkspace.shared.open(url)
+                }
+                Divider()
+            }
+            Button("Settings…") {
+                appDelegate.showSettings()
+            }
+            .keyboardShortcut(",")
+            Divider()
             Button("Quit Archivator") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
         } label: {
-            Image("MenuIcon")
+            if updates.available != nil {
+                Image(nsImage: UpdateChecker.badgedIcon())
+            } else {
+                Image("MenuIcon")
+            }
         }
     }
 }
@@ -26,9 +43,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hideWork: DispatchWorkItem?
     private let wheelSize: CGFloat = 360
     private let panelSize: CGFloat = 420
+    private var settingsWindow: NSWindow?
+
+    @MainActor
+    func showSettings() {
+        if settingsWindow == nil {
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
+            w.title = "Archivator Settings"
+            w.styleMask = [.titled, .closable]
+            w.isReleasedWhenClosed = false
+            w.center()
+            settingsWindow = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         registerFonts()
+        Task { @MainActor in UpdateChecker.shared.start() }
         model.chooseFolder = { [weak self] in self?.chooseFolder() }
         let t = Timer(timeInterval: 0.03, repeats: true) { [weak self] _ in
             self?.tick()
