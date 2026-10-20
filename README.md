@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="docs/social-preview.png" alt="Archivator: a radial archive tool for the macOS menu bar" width="100%">
+</p>
+
+<p align="center">
   Hold <b>⌥ Option</b> while dragging files to compress or extract them.<br>
   Lives in your menu bar. The result is saved next to the original.
 </p>
