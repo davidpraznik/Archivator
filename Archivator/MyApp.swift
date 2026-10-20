@@ -6,11 +6,13 @@ struct ArchivatorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Archivator", systemImage: "archivebox") {
+        MenuBarExtra {
             Button("Quit Archivator") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
+        } label: {
+            Image("MenuIcon")
         }
     }
 }
