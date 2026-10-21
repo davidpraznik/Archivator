@@ -63,7 +63,7 @@ The app does not use the App Sandbox. Detecting a file drag needs no special per
 
 ## Works with Konverter
 
-Konverter uses **⇧ Shift** and **⌘ Command** while dragging, Archivator uses **⌥ Option**, so both can run at the same time.
+Konverter uses **⇧ Shift** and **⌘ Command** while dragging. Archivator uses **⌥ Option** by default (changeable in Settings) and never reacts to Shift or Command, so both can run at the same time.
 
 ## Third-party components
 
