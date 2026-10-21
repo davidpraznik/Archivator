@@ -111,12 +111,18 @@ enum Archiver {
 
         do {
             switch format {
-            case .zip:
+            case .zip where urls.count == 1:
+                // en predmet: ditto, enako kot Finder
                 try run("/usr/bin/ditto",
-                        ["-c", "-k", "--sequesterRsrc", "--keepParent"] + urls.map { $0.path } + [out.path])
-            case .sevenZ, .tarGz:
+                        ["-c", "-k", "--sequesterRsrc", "--keepParent", first.path, out.path])
+            case .zip, .sevenZ, .tarGz:
+                // ditto ne zna več virov naenkrat, zato več predmetov gre prek bsdtar
                 var args = ["--exclude", ".DS_Store"]
-                args += format == .sevenZ ? ["--format", "7zip", "-cf", out.path] : ["-czf", out.path]
+                switch format {
+                case .zip: args += ["--format", "zip", "-cf", out.path]
+                case .sevenZ: args += ["--format", "7zip", "-cf", out.path]
+                case .tarGz: args += ["-czf", out.path]
+                }
                 for u in urls {
                     args += ["-C", u.deletingLastPathComponent().path, u.lastPathComponent]
                 }
