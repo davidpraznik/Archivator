@@ -14,6 +14,37 @@ enum ArchiveFormat: String, CaseIterable, Identifiable {
     }
 }
 
+// Tipka, ki jo držiš med vlečenjem. Shift in Command pripadata Konverterju.
+enum TriggerKey: String, CaseIterable, Identifiable {
+    case option, control, controlOption
+    var id: String { rawValue }
+
+    static let storageKey = "triggerKey"
+
+    var label: String {
+        switch self {
+        case .option: return "⌥ Option"
+        case .control: return "⌃ Control"
+        case .controlOption: return "⌃⌥ Control + Option"
+        }
+    }
+
+    static var current: TriggerKey {
+        TriggerKey(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .option
+    }
+
+    func matches(_ flags: NSEvent.ModifierFlags) -> Bool {
+        if flags.contains(.shift) || flags.contains(.command) { return false }
+        let option = flags.contains(.option)
+        let control = flags.contains(.control)
+        switch self {
+        case .option: return option && !control
+        case .control: return control && !option
+        case .controlOption: return option && control
+        }
+    }
+}
+
 enum Target: Hashable {
     case compress(ArchiveFormat)
     case extractHere

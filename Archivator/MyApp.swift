@@ -86,10 +86,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if wheelVisible { return }
 
-        // Option + vleci. Shift in Command pripadata Konverterju.
-        let flags = NSEvent.modifierFlags
-        let option = flags.contains(.option) && !flags.contains(.shift) && !flags.contains(.command)
-        guard pb.changeCount != baselineCount, option else { return }
+        // Izbrana tipka (privzeto Option) + vleci. Shift in Command pripadata Konverterju.
+        guard pb.changeCount != baselineCount,
+              TriggerKey.current.matches(NSEvent.modifierFlags) else { return }
 
         let urls = (pb.readObjects(
             forClasses: [NSURL.self],

@@ -33,6 +33,8 @@ If everything you drag is an archive, the wheel offers **Extract here** (into a 
 
 Dropping on the centre or between segments does nothing.
 
+Press **Esc** to cancel a running job. The trigger key can be changed to **⌃ Control** or **⌃⌥ Control + Option** in Settings (**⇧ Shift** and **⌘ Command** are used by [Konverter](https://github.com/davidpraznik/Konverter)).
+
 ## Security
 
 Extraction uses the system `tar` (libarchive) without the option that preserves absolute paths. Entries with `..` in the path are refused, absolute paths are made relative, and writing through symbolic links that point outside the target folder is refused. If an archive contains such an entry, extraction stops and the partly extracted folder is removed.

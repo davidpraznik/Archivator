@@ -156,6 +156,7 @@ final class SettingsModel: ObservableObject {
 struct SettingsView: View {
     @StateObject private var model = SettingsModel()
     @ObservedObject private var updates = UpdateChecker.shared
+    @AppStorage(TriggerKey.storageKey) private var triggerKey = TriggerKey.option.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -165,6 +166,18 @@ struct SettingsView: View {
             ))
 
             Toggle("Check for updates automatically", isOn: $updates.autoCheck)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Picker("Trigger key", selection: $triggerKey) {
+                    ForEach(TriggerKey.allCases) { key in
+                        Text(key.label).tag(key.rawValue)
+                    }
+                }
+                .fixedSize()
+                Text("Hold it while dragging files to show the wheel.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
