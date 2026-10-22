@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/social-preview.png" alt="Archivator: a radial archive tool for the macOS menu bar" width="100%">
+  <img src="docs/social-preview-v3.png" alt="Archivator: a radial archive tool for the macOS menu bar" width="100%">
 </p>
 
 <p align="center">
