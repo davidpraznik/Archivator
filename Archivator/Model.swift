@@ -52,6 +52,39 @@ enum WheelStyle: String, CaseIterable, Identifiable {
     var label: String { self == .glass ? "Glass" : "Solid" }
 }
 
+enum CompressionLevel: String, CaseIterable, Identifiable {
+    case fast, balanced, best
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+}
+
+enum ResultMode: String, CaseIterable, Identifiable {
+    case nextToOriginal, ask
+    var id: String { rawValue }
+    var label: String { self == .nextToOriginal ? "Save next to original" : "Ask where to save" }
+}
+
+// Nastavitve stiskanja (shranjene v UserDefaults, berejo se ob vsakem poslu)
+enum CompressionSettings {
+    static let levelKey = "compressionLevel"
+    static let storeKey = "storeCompressed"
+    static let crossZipKey = "crossPlatformZip"
+    static let resultKey = "compressionResult"
+
+    nonisolated static var level: CompressionLevel {
+        CompressionLevel(rawValue: UserDefaults.standard.string(forKey: levelKey) ?? "") ?? .balanced
+    }
+    nonisolated static var storeCompressed: Bool {
+        UserDefaults.standard.object(forKey: storeKey) as? Bool ?? true
+    }
+    nonisolated static var crossPlatformZip: Bool {
+        UserDefaults.standard.object(forKey: crossZipKey) as? Bool ?? true
+    }
+    nonisolated static var result: ResultMode {
+        ResultMode(rawValue: UserDefaults.standard.string(forKey: resultKey) ?? "") ?? .nextToOriginal
+    }
+}
+
 enum Target: Hashable {
     case compress(ArchiveFormat)
     case extractHere
@@ -94,5 +127,5 @@ final class WheelModel: ObservableObject {
     @Published var progress: Double = 0
     @Published var total = 0
     // nastavi AppDelegate: pokaže izbirnik mape, vrne nil ob preklicu
-    var chooseFolder: (() -> URL?)? = nil
+    var chooseFolder: ((_ forExtract: Bool) -> URL?)? = nil
 }

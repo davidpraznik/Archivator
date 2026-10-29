@@ -265,10 +265,14 @@ struct WheelView: View {
         model.progress = 0
         model.message = "…"
 
-        if case .extractTo = target {
+        var askFolder = false
+        if case .extractTo = target { askFolder = true }
+        if isCompress && CompressionSettings.result == .ask { askFolder = true }
+
+        if askFolder {
             // izbirnik mape po kratkem zamiku, da se vlečenje najprej konča
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                if let folder = model.chooseFolder?() {
+                if let folder = model.chooseFolder?(!isCompress) {
                     start(urls, target, folder)
                 } else {
                     model.message = "CANCELED"
@@ -289,7 +293,7 @@ struct WheelView: View {
             case .compress(let format):
                 jobs = 1
                 do {
-                    try Archiver.compress(urls, as: format)
+                    try Archiver.compress(urls, as: format, into: folder)
                     ok = 1
                 } catch {
                     Archiver.log(error)

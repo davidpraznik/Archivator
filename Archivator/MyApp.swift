@@ -44,7 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var wheelVisible = false
     private var hideWork: DispatchWorkItem?
     private let wheelSize: CGFloat = 360
-    private let panelSize: CGFloat = 420
+    private let panelSize: CGFloat = 480
     private var settingsWindow: NSWindow?
 
     @MainActor
@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         registerFonts()
         Task { @MainActor in UpdateChecker.shared.start() }
-        model.chooseFolder = { [weak self] in self?.chooseFolder() }
+        model.chooseFolder = { [weak self] forExtract in self?.chooseFolder(forExtract: forExtract) }
         // Časovnik teče samo, dokler je levi gumb miške pritisnjen (ali dokler kolo dela).
         mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             self?.startPolling()
@@ -167,8 +167,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wheelVisible = true
     }
 
-    // "Extract to…": kolo se umakne, odpre se izbirnik mape
-    private func chooseFolder() -> URL? {
+    // "Extract to…" ali stiskanje z "Ask where to save": kolo se umakne, odpre se izbirnik mape
+    private func chooseFolder(forExtract: Bool) -> URL? {
         panel?.orderOut(nil)
         NSApp.activate(ignoringOtherApps: true)
         let open = NSOpenPanel()
@@ -176,8 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         open.canChooseDirectories = true
         open.canCreateDirectories = true
         open.allowsMultipleSelection = false
-        open.prompt = "Extract"
-        open.message = "Choose where to extract"
+        open.prompt = forExtract ? "Extract" : "Save"
+        open.message = forExtract ? "Choose where to extract" : "Choose where to save"
         let result = open.runModal()
         NSApp.hide(nil)
         panel?.orderFrontRegardless()

@@ -158,6 +158,10 @@ struct SettingsView: View {
     @ObservedObject private var updates = UpdateChecker.shared
     @AppStorage(TriggerKey.storageKey) private var triggerKey = TriggerKey.option.rawValue
     @AppStorage(WheelStyle.storageKey) private var wheelStyle = WheelStyle.glass.rawValue
+    @AppStorage(CompressionSettings.levelKey) private var level = CompressionLevel.balanced.rawValue
+    @AppStorage(CompressionSettings.storeKey) private var storeCompressed = true
+    @AppStorage(CompressionSettings.crossZipKey) private var crossZip = true
+    @AppStorage(CompressionSettings.resultKey) private var result = ResultMode.nextToOriginal.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -198,6 +202,61 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .fixedSize()
                 }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("COMPRESSION")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Level").frame(width: 72, alignment: .leading)
+                    Picker("Level", selection: $level) {
+                        ForEach(CompressionLevel.allCases) { l in
+                            Text(l.label).tag(l.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
+                Text("7Z, TAR.GZ and cross-platform ZIP. Best is smallest but slowest.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 80)
+
+                Toggle("Store already compressed files", isOn: $storeCompressed)
+                Text("Video, photos, music and archives are not squeezed again. Much faster.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 20)
+
+                Toggle("Cross-platform ZIP", isOn: $crossZip)
+                Text("Leaves out __MACOSX and .DS_Store, so the ZIP opens cleanly on Windows.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 20)
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Result").frame(width: 72, alignment: .leading)
+                    Picker("Result", selection: $result) {
+                        ForEach(ResultMode.allCases) { r in
+                            Text(r.label).tag(r.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                Text("Or choose Ask where to save to pick a folder each time.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 80)
             }
 
             VStack(alignment: .leading, spacing: 8) {

@@ -101,32 +101,100 @@ enum Archiver {
         }
     }
 
-    // Stisne vse predmete v en arhiv poleg prvega predmeta.
+    // Končnice, ki jih ponovno stiskanje skoraj ne zmanjša
+    nonisolated static let compressedExtensions: Set<String> = [
+        "mp4", "m4v", "mov", "mkv", "avi", "webm", "mpg", "mpeg",
+        "jpg", "jpeg", "png", "heic", "heif", "webp", "avif", "gif",
+        "mp3", "m4a", "aac", "flac", "ogg", "opus", "wma",
+        "zip", "7z", "gz", "tgz", "bz2", "xz", "rar", "dmg"
+    ]
+
+    // Ali je vsaj 90 % podatkov že stisnjenih (po končnicah). Pri veliki mapi odneha in vrne false.
+    nonisolated static func isMostlyCompressed(_ urls: [URL]) -> Bool {
+        var packed: Int64 = 0
+        var total: Int64 = 0
+        var seen = 0
+        func add(_ file: URL) {
+            guard let v = try? file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+                  v.isRegularFile == true else { return }
+            let size = Int64(v.fileSize ?? 0)
+            total += size
+            if compressedExtensions.contains(file.pathExtension.lowercased()) { packed += size }
+        }
+        for u in urls {
+            if isDirectory(u) {
+                guard let en = FileManager.default.enumerator(at: u, includingPropertiesForKeys: nil) else { continue }
+                while let f = en.nextObject() as? URL {
+                    seen += 1
+                    if seen > 50_000 { return false }
+                    add(f)
+                }
+            } else {
+                add(u)
+            }
+        }
+        return total > 0 && Double(packed) / Double(total) >= 0.9
+    }
+
+    // Možnosti libarchive (--options). Če jih tar ne pozna, se stiskanje ponovi brez njih.
+    nonisolated static func tarOptions(for format: ArchiveFormat, level: CompressionLevel, store: Bool) -> [String] {
+        let module: String
+        switch format {
+        case .zip: module = "zip"
+        case .sevenZ: module = "7zip"
+        case .tarGz: module = "gzip"
+        }
+        if store {
+            switch format {
+            case .zip: return ["zip:compression=store"]
+            case .sevenZ: return ["7zip:compression=copy"]
+            case .tarGz: return ["gzip:compression-level=0"]
+            }
+        }
+        switch level {
+        case .fast: return ["\(module):compression-level=1"]
+        case .balanced: return []
+        case .best: return ["\(module):compression-level=9"]
+        }
+    }
+
+    nonisolated static func runTar(_ urls: [URL], as format: ArchiveFormat, to out: URL, options: [String]) throws {
+        var args = ["--exclude", ".DS_Store"]
+        for o in options { args += ["--options", o] }
+        switch format {
+        case .zip: args += ["--format", "zip", "-cf", out.path]
+        case .sevenZ: args += ["--format", "7zip", "-cf", out.path]
+        case .tarGz: args += ["-czf", out.path]
+        }
+        for u in urls {
+            args += ["-C", u.deletingLastPathComponent().path, u.lastPathComponent]
+        }
+        try run("/usr/bin/tar", args)
+    }
+
+    // Stisne vse predmete v en arhiv poleg prvega predmeta (ali v izbrano mapo).
     @discardableResult
-    nonisolated static func compress(_ urls: [URL], as format: ArchiveFormat) throws -> URL {
+    nonisolated static func compress(_ urls: [URL], as format: ArchiveFormat, into destination: URL? = nil) throws -> URL {
         guard let first = urls.first else { throw Failure(message: "nothing to compress") }
-        let parent = first.deletingLastPathComponent()
+        let parent = destination ?? first.deletingLastPathComponent()
         let base = urls.count == 1 ? first.lastPathComponent : "Archive"
         let out = uniqueURL(in: parent, name: base, ext: format.ext)
 
         do {
-            switch format {
-            case .zip where urls.count == 1:
-                // en predmet: ditto, enako kot Finder
+            if format == .zip && urls.count == 1 && !CompressionSettings.crossPlatformZip {
+                // en predmet: ditto, enako kot Finder (doda __MACOSX, če so razširjeni atributi)
                 try run("/usr/bin/ditto",
                         ["-c", "-k", "--sequesterRsrc", "--keepParent", first.path, out.path])
-            case .zip, .sevenZ, .tarGz:
-                // ditto ne zna več virov naenkrat, zato več predmetov gre prek bsdtar
-                var args = ["--exclude", ".DS_Store"]
-                switch format {
-                case .zip: args += ["--format", "zip", "-cf", out.path]
-                case .sevenZ: args += ["--format", "7zip", "-cf", out.path]
-                case .tarGz: args += ["-czf", out.path]
+            } else {
+                let store = CompressionSettings.storeCompressed && isMostlyCompressed(urls)
+                let options = tarOptions(for: format, level: CompressionSettings.level, store: store)
+                do {
+                    try runTar(urls, as: format, to: out, options: options)
+                } catch {
+                    if error is Cancelled || options.isEmpty { throw error }
+                    try? FileManager.default.removeItem(at: out)
+                    try runTar(urls, as: format, to: out, options: [])
                 }
-                for u in urls {
-                    args += ["-C", u.deletingLastPathComponent().path, u.lastPathComponent]
-                }
-                try run("/usr/bin/tar", args)
             }
         } catch {
             try? FileManager.default.removeItem(at: out)
