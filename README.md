@@ -4,7 +4,7 @@
 
 <p align="center">
   Hold <b>⌥ Option</b> while dragging files to compress or extract them.<br>
-  Lives in your menu bar. The result is saved next to the original.
+  Lives in your menu bar and is built to be energy efficient: it only does work while you are using it. The result is saved next to the original.
 </p>
 
 <p align="center">
@@ -12,6 +12,10 @@
   <img src="https://img.shields.io/badge/macOS-14.6%2B-FC5159" alt="macOS 14.6+">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-FC5159" alt="MIT licence"></a>
 </p>
+
+## Energy efficient
+
+Archivator is optimised for low energy use. It only listens for a mouse press. Drag detection runs only while the mouse button is held down and stops as soon as you release it, and the CPU is busy only while an archive is being made or extracted. Apart from the optional update check (once a day), nothing runs in the background, so an idle Archivator does not drain your battery.
 
 ## Formats
 
@@ -33,7 +37,20 @@ If everything you drag is an archive, the wheel offers **Extract here** (into a 
 
 Dropping on the centre or between segments does nothing.
 
-Press **Esc** to cancel a running job. The trigger key can be changed to **⌃ Control** or **⌃⌥ Control + Option** in Settings (**⇧ Shift** and **⌘ Command** are used by [Konverter](https://github.com/davidpraznik/Konverter)).
+While a job runs, the centre of the wheel shows the progress: a percentage when several files are compressed, the size written so far for a single file, or the elapsed time when extracting. You can drag the wheel out of the way by its disk. Press **Esc** to cancel a running job. The trigger key can be changed to **⌃ Control** or **⌃⌥ Control + Option** in Settings (**⇧ Shift** and **⌘ Command** are used by [Konverter](https://github.com/davidpraznik/Konverter)).
+
+## Settings
+
+Menu bar icon, Settings…
+
+- Launch at login, check for updates (GitHub releases, optional automatic check once a day).
+- **Trigger key**: ⌥ Option (default), ⌃ Control or ⌃⌥ Control + Option.
+- **Style**: *Glass* (translucent wheel carrier) or *Solid* (the classic look).
+- **Compression**: level (Fast, Balanced, Best), *store* files that are already compressed (video, images, archives) instead of compressing them again, cross-platform ZIP (no `__MACOSX` or `.DS_Store` entries), and whether the result is saved next to the original or you choose the folder each time.
+
+<p align="center">
+  <img src="docs/settings-v1.png" alt="Archivator Settings window" width="380">
+</p>
 
 ## Security
 
