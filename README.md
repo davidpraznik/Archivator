@@ -49,7 +49,7 @@ Menu bar icon, Settings…
 - **Compression**: level (Fast, Balanced, Best), *store* files that are already compressed (video, images, archives) instead of compressing them again, cross-platform ZIP (no `__MACOSX` or `.DS_Store` entries), and whether the result is saved next to the original or you choose the folder each time.
 
 <p align="center">
-  <img src="docs/settings-v1.png" alt="Archivator Settings window" width="380">
+  <img src="docs/settings-pair-v5.png" alt="Archivator Settings window in light and dark appearance" width="760">
 </p>
 
 ## Security
