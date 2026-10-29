@@ -157,6 +157,7 @@ struct SettingsView: View {
     @StateObject private var model = SettingsModel()
     @ObservedObject private var updates = UpdateChecker.shared
     @AppStorage(TriggerKey.storageKey) private var triggerKey = TriggerKey.option.rawValue
+    @AppStorage(WheelStyle.storageKey) private var wheelStyle = WheelStyle.glass.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -177,6 +178,26 @@ struct SettingsView: View {
                 Text("Hold it while dragging files to show the wheel.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("APPEARANCE")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Style").frame(width: 72, alignment: .leading)
+                    Picker("Style", selection: $wheelStyle) {
+                        ForEach(WheelStyle.allCases) { st in
+                            Text(st.label).tag(st.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
             }
 
             VStack(alignment: .leading, spacing: 8) {

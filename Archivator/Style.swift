@@ -49,8 +49,15 @@ func registerFonts() {
     if let url = Bundle.main.url(forResource: "Inter-SemiBold", withExtension: "ttf") {
         CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
     }
+    if let url = Bundle.main.url(forResource: "Inter-Regular", withExtension: "otf") {
+        CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+    }
 }
 
 func inter(_ size: CGFloat) -> Font {
     Font.custom("Inter-SemiBold", size: size)
+}
+
+func interRegular(_ size: CGFloat) -> Font {
+    Font.custom("Inter-Regular", size: size)
 }

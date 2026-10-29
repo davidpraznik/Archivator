@@ -135,10 +135,22 @@ struct WheelDropDelegate: DropDelegate {
     }
 }
 
+struct VisualEffectDisk: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.blendingMode = .behindWindow
+        v.material = .popover
+        v.state = .active
+        return v
+    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
 struct WheelView: View {
     @ObservedObject var model: WheelModel
     let size: CGFloat
     @Environment(\.colorScheme) private var scheme
+    @AppStorage(WheelStyle.storageKey) private var style = WheelStyle.glass.rawValue
     @State private var targeted: Target? = nil
     @State private var overCenter = false
 
@@ -152,9 +164,7 @@ struct WheelView: View {
         let centerText = hint ?? (model.message.isEmpty ? (targeted?.shortLabel ?? "") : model.message)
 
         ZStack {
-            Circle()
-                .fill(p.disk)
-                .shadow(color: Color.black.opacity(scheme == .dark ? 0.5 : 0.22), radius: 16 * u, x: 0, y: 10 * u)
+            disk(p: p, u: u)
 
             ForEach(Array(targets.enumerated()), id: \.offset) { index, target in
                 segment(index: index, count: targets.count, target: target, p: p, u: u)
@@ -178,7 +188,7 @@ struct WheelView: View {
             }
 
             Circle()
-                .fill(p.wedge)
+                .fill(p.wedge.opacity(style == WheelStyle.glass.rawValue ? 0.88 : 1))
                 .frame(width: 112 * u, height: 112 * u)
             VStack(spacing: 4 * u) {
                 Text(centerText)
@@ -214,6 +224,35 @@ struct WheelView: View {
         "EASY!", "CRISP!", "NICE ONE!", "SORTED!", "FLAWLESS!",
         "TOO EASY!", "CLEAN!"
     ]
+
+    // Nosilec kolesa: Solid je polna barva, Glass je zamegljeno ozadje z barvno tinto in svetlim robom
+    @ViewBuilder
+    private func disk(p: Palette, u: CGFloat) -> some View {
+        let shadow = Color.black.opacity(scheme == .dark ? 0.5 : 0.22)
+        if style == WheelStyle.glass.rawValue {
+            ZStack {
+                VisualEffectDisk()
+                Circle().fill(p.disk.opacity(0.25))
+                Circle().fill(LinearGradient(
+                    colors: [Color.white.opacity(scheme == .dark ? 0.10 : 0.45), Color.white.opacity(0.0), Color.white.opacity(scheme == .dark ? 0.06 : 0.25)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .overlay(
+                Circle().strokeBorder(
+                    LinearGradient(
+                        colors: [Color.white.opacity(scheme == .dark ? 0.35 : 0.9), Color.white.opacity(0.15), Color.white.opacity(scheme == .dark ? 0.2 : 0.6)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing),
+                    lineWidth: 1.2 * u)
+            )
+            .shadow(color: shadow, radius: 16 * u, x: 0, y: 10 * u)
+        } else {
+            Circle()
+                .fill(p.disk)
+                .shadow(color: shadow, radius: 16 * u, x: 0, y: 10 * u)
+        }
+    }
 
     private func run(_ urls: [URL], _ target: Target) {
         guard !urls.isEmpty else { return }
@@ -306,9 +345,17 @@ struct WheelView: View {
         let px = size / 2 + r * cos(center)
         let py = size / 2 + r * sin(center)
 
+        // Pri Glass so neaktivni izseki rahlo prosojni (88 %), aktivni je poln
+        let glass = style == WheelStyle.glass.rawValue
+        let wedgeOpacity: Double = (glass && !active) ? 0.88 : 1
+
         return ZStack {
-            shape.fill(fill)
-            shape.stroke(fill, style: StrokeStyle(lineWidth: 12 * u, lineJoin: .round))
+            ZStack {
+                shape.fill(fill)
+                shape.stroke(fill, style: StrokeStyle(lineWidth: 12 * u, lineJoin: .round))
+            }
+            .compositingGroup()
+            .opacity(wedgeOpacity)
             Text(target.label)
                 .font(inter(15 * u))
                 .foregroundStyle(labelColor)

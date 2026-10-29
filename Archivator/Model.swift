@@ -45,6 +45,13 @@ enum TriggerKey: String, CaseIterable, Identifiable {
     }
 }
 
+enum WheelStyle: String, CaseIterable, Identifiable {
+    case glass, solid
+    static let storageKey = "wheelStyle"
+    var id: String { rawValue }
+    var label: String { self == .glass ? "Glass" : "Solid" }
+}
+
 enum Target: Hashable {
     case compress(ArchiveFormat)
     case extractHere
