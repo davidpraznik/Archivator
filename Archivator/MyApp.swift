@@ -65,6 +65,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registerFonts()
         Task { @MainActor in UpdateChecker.shared.start() }
         model.chooseFolder = { [weak self] forExtract in self?.chooseFolder(forExtract: forExtract) }
+        model.moveWheel = { [weak self] dx, dy in
+            guard let p = self?.panel else { return }
+            p.setFrameOrigin(NSPoint(x: p.frame.origin.x + dx, y: p.frame.origin.y + dy))
+        }
         // Časovnik teče samo, dokler je levi gumb miške pritisnjen (ali dokler kolo dela).
         mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             self?.startPolling()
@@ -152,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.message = ""
         model.chosen = nil
         model.progress = 0
+        model.fraction = nil
         model.total = 0
         if panel == nil { panel = makePanel() }
 

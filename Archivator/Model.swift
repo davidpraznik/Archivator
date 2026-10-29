@@ -125,7 +125,11 @@ final class WheelModel: ObservableObject {
     @Published var busy = false
     @Published var chosen: Target? = nil
     @Published var progress: Double = 0
+    // delež tekočega posla, če ga znamo izračunati (stiskanje več datotek); sicer nil
+    @Published var fraction: Double? = nil
     @Published var total = 0
     // nastavi AppDelegate: pokaže izbirnik mape, vrne nil ob preklicu
     var chooseFolder: ((_ forExtract: Bool) -> URL?)? = nil
+    // premik okna kolesa med delom (razlika v zaslonskih točkah)
+    var moveWheel: ((_ dx: CGFloat, _ dy: CGFloat) -> Void)? = nil
 }

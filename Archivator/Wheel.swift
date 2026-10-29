@@ -153,6 +153,8 @@ struct WheelView: View {
     @AppStorage(WheelStyle.storageKey) private var style = WheelStyle.glass.rawValue
     @State private var targeted: Target? = nil
     @State private var overCenter = false
+    @State private var lastMouse: NSPoint? = nil
+    @State private var handShown = false
 
     var body: some View {
         let p = Palette(scheme)
@@ -170,7 +172,16 @@ struct WheelView: View {
                 segment(index: index, count: targets.count, target: target, p: p, u: u)
             }
 
-            if model.busy && model.total > 1 {
+            if model.busy, let f = model.fraction {
+                Circle()
+                    .stroke(p.track, lineWidth: 3 * u)
+                    .frame(width: 118 * u, height: 118 * u)
+                Circle()
+                    .trim(from: 0, to: CGFloat(f))
+                    .stroke(p.progress, style: StrokeStyle(lineWidth: 3 * u, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: 118 * u, height: 118 * u)
+            } else if model.busy && model.total > 1 {
                 Circle()
                     .stroke(p.track, lineWidth: 3 * u)
                     .frame(width: 118 * u, height: 118 * u)
@@ -206,6 +217,9 @@ struct WheelView: View {
             }
         }
         .frame(width: size, height: size)
+        .contentShape(Circle())
+        .gesture(moveGesture)
+        .onHover { updateHand($0) }
         .onDrop(of: [.fileURL], delegate: WheelDropDelegate(
             size: size,
             inner: 62 * u,
@@ -217,6 +231,30 @@ struct WheelView: View {
                 run(urls, target)
             }
         ))
+    }
+
+    // Premik kolesa med delom
+    private var moveGesture: some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .global)
+            .onChanged { _ in
+                guard model.busy else { return }
+                let now = NSEvent.mouseLocation
+                if let last = lastMouse {
+                    model.moveWheel?(now.x - last.x, now.y - last.y)
+                }
+                lastMouse = now
+            }
+            .onEnded { _ in lastMouse = nil }
+    }
+
+    private func updateHand(_ inside: Bool) {
+        if inside && model.busy && !handShown {
+            NSCursor.openHand.push()
+            handShown = true
+        } else if !inside && handShown {
+            NSCursor.pop()
+            handShown = false
+        }
     }
 
     private static let cheers = [
@@ -263,6 +301,7 @@ struct WheelView: View {
         // stiskanje je en sam posel, razpakiranje en posel na arhiv
         model.total = isCompress ? 1 : urls.count
         model.progress = 0
+        model.fraction = nil
         model.message = "…"
 
         var askFolder = false
@@ -284,6 +323,29 @@ struct WheelView: View {
         }
     }
 
+    // Tekst v sredini med delom: odstotek, zapisana velikost ali čas. Prvi dve sekundi samo "…".
+    private static func show(_ r: Archiver.Readout, model: WheelModel) {
+        guard model.busy, !Archiver.wasCancelled else { return }
+        model.fraction = r.fraction
+        guard r.elapsed >= 2 else { return }
+        if let f = r.fraction {
+            model.message = "\(Int((f * 100).rounded())) %"
+        } else if let b = r.bytes, b > 0 {
+            model.message = ByteCountFormatter.string(fromByteCount: b, countStyle: .file)
+        } else {
+            let t = Int(r.elapsed)
+            model.message = String(format: "%d:%02d", t / 60, t % 60)
+        }
+    }
+
+    private nonisolated static func makeReporter(model: WheelModel) -> (Archiver.Readout) -> Void {
+        nonisolated(unsafe) let target = model
+        let report: (Archiver.Readout) -> Void = { r in
+            DispatchQueue.main.async { WheelView.show(r, model: target) }
+        }
+        return report
+    }
+
     private func start(_ urls: [URL], _ target: Target, _ folder: URL?) {
         Archiver.beginJob()
         DispatchQueue.global(qos: .userInitiated).async {
@@ -293,17 +355,20 @@ struct WheelView: View {
             case .compress(let format):
                 jobs = 1
                 do {
-                    try Archiver.compress(urls, as: format, into: folder)
+                    try Archiver.compress(urls, as: format, into: folder, progress: Self.makeReporter(model: model))
                     ok = 1
                 } catch {
                     Archiver.log(error)
                 }
             case .extractHere, .extractTo:
                 jobs = urls.count
+                // čas prikažemo samo pri enem arhivu; pri več njih kaže napredek n/N
+                var reporter: ((Archiver.Readout) -> Void)? = nil
+                if urls.count == 1 { reporter = Self.makeReporter(model: model) }
                 for (i, url) in urls.enumerated() {
                     if Archiver.wasCancelled { break }
                     do {
-                        try Archiver.extract(url, into: folder)
+                        try Archiver.extract(url, into: folder, progress: reporter)
                         ok += 1
                     } catch {
                         Archiver.log(error)
@@ -327,6 +392,7 @@ struct WheelView: View {
                 } else {
                     model.message = "⚠︎ \(ok)/\(jobs)"
                 }
+                model.fraction = nil
                 model.busy = false
             }
         }

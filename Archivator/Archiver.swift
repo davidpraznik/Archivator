@@ -73,7 +73,8 @@ enum Archiver {
         return stripped.isEmpty ? "Extracted" : stripped
     }
 
-    nonisolated static func run(_ executable: String, _ arguments: [String]) throws {
+    nonisolated static func run(_ executable: String, _ arguments: [String],
+                                onLine: (@Sendable (String) -> Void)? = nil) throws {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: executable)
         p.arguments = arguments
@@ -88,7 +89,23 @@ enum Archiver {
         try p.run()
         job.process = p
         job.lock.unlock()
-        let data = err.fileHandleForReading.readDataToEndOfFile()
+        // stderr beremo sproti (za napredek); hranimo samo zadnji del za sporočilo o napaki
+        var pending = Data()
+        var tail = Data()
+        let handle = err.fileHandleForReading
+        while true {
+            let chunk = handle.availableData
+            if chunk.isEmpty { break }
+            tail.append(chunk)
+            if tail.count > 8192 { tail = tail.suffix(8192) }
+            guard let onLine = onLine else { continue }
+            pending.append(chunk)
+            while let nl = pending.firstIndex(of: 0x0A) {
+                let line = pending[pending.startIndex..<nl]
+                pending = Data(pending[(nl + 1)...])
+                if let text = String(data: line, encoding: .utf8) { onLine(text) }
+            }
+        }
         p.waitUntilExit()
         job.lock.lock()
         job.process = nil
@@ -96,9 +113,96 @@ enum Archiver {
         job.lock.unlock()
         if wasCancelled { throw Cancelled() }
         if p.terminationStatus != 0 {
-            let text = String(data: data, encoding: .utf8) ?? ""
+            let text = String(data: tail, encoding: .utf8) ?? ""
             throw Failure(message: "\(executable) exit \(p.terminationStatus): \(text)")
         }
+    }
+
+    // MARK: Napredek
+
+    // Kar vidi uporabnik: delež (če ga znamo izračunati), zapisana velikost ali pretečeni čas.
+    nonisolated struct Readout: Sendable {
+        var fraction: Double?
+        var bytes: Int64?
+        var elapsed: TimeInterval
+    }
+
+    nonisolated final class Meter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var sizes: [String: Int64] = [:]
+        private var total: Int64 = 0
+        private var done: Int64 = 0
+        private var previous: Int64 = 0
+        private(set) var fileCount = 0
+        private(set) var usable = false
+
+        // Pregleda vhodne predmete. Pri več kot 50 000 vnosih odneha (delež ni na voljo).
+        init(_ urls: [URL]) {
+            var seen = 0
+            func add(_ file: URL, base: String) {
+                guard let v = try? file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+                      v.isRegularFile == true else { return }
+                let size = Int64(v.fileSize ?? 0)
+                let path = file.path
+                guard path.hasPrefix(base) else { return }
+                sizes[String(path.dropFirst(base.count))] = size
+                total += size
+                fileCount += 1
+            }
+            for u in urls {
+                let base = u.deletingLastPathComponent().path + "/"
+                if Archiver.isDirectory(u) {
+                    guard let en = FileManager.default.enumerator(at: u, includingPropertiesForKeys: nil) else { continue }
+                    while let f = en.nextObject() as? URL {
+                        seen += 1
+                        if seen > 50_000 { return }
+                        add(f, base: base)
+                    }
+                } else {
+                    add(u, base: base)
+                }
+            }
+            usable = true
+        }
+
+        // Vrstica "a pot" pomeni, da je tar začel naslednji vnos; prejšnji je končan.
+        func line(_ text: String) {
+            guard text.hasPrefix("a ") else { return }
+            let name = String(text.dropFirst(2))
+            lock.lock()
+            done += previous
+            previous = sizes[name] ?? 0
+            lock.unlock()
+        }
+
+        func reset() {
+            lock.lock(); done = 0; previous = 0; lock.unlock()
+        }
+
+        var fraction: Double? {
+            lock.lock(); defer { lock.unlock() }
+            guard usable, fileCount > 1, total > 0 else { return nil }
+            return min(Double(done) / Double(total), 0.99)
+        }
+    }
+
+    // Vsake pol sekunde sporoči napredek, dokler posel teče.
+    private nonisolated static func startReporter(output: URL?, meter: Meter?,
+                                                   report: @escaping (Readout) -> Void) -> DispatchSourceTimer {
+        let start = Date()
+        nonisolated(unsafe) let report = report
+        let t = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        t.schedule(deadline: .now() + 0.5, repeating: 0.5, leeway: .milliseconds(100))
+        t.setEventHandler {
+            var size: Int64? = nil
+            if let output = output,
+               let v = try? output.resourceValues(forKeys: [.fileSizeKey]), let n = v.fileSize {
+                size = Int64(n)
+            }
+            report(Readout(fraction: meter?.fraction, bytes: size, elapsed: Date().timeIntervalSince(start)))
+        }
+        t.resume()
+        return t
     }
 
     // Končnice, ki jih ponovno stiskanje skoraj ne zmanjša
@@ -158,8 +262,10 @@ enum Archiver {
         }
     }
 
-    nonisolated static func runTar(_ urls: [URL], as format: ArchiveFormat, to out: URL, options: [String]) throws {
+    nonisolated static func runTar(_ urls: [URL], as format: ArchiveFormat, to out: URL, options: [String],
+                                   meter: Meter? = nil) throws {
         var args = ["--exclude", ".DS_Store"]
+        if meter != nil { args.append("-v") }
         for o in options { args += ["--options", o] }
         switch format {
         case .zip: args += ["--format", "zip", "-cf", out.path]
@@ -169,16 +275,25 @@ enum Archiver {
         for u in urls {
             args += ["-C", u.deletingLastPathComponent().path, u.lastPathComponent]
         }
-        try run("/usr/bin/tar", args)
+        if let meter = meter {
+            try run("/usr/bin/tar", args, onLine: { meter.line($0) })
+        } else {
+            try run("/usr/bin/tar", args)
+        }
     }
 
     // Stisne vse predmete v en arhiv poleg prvega predmeta (ali v izbrano mapo).
     @discardableResult
-    nonisolated static func compress(_ urls: [URL], as format: ArchiveFormat, into destination: URL? = nil) throws -> URL {
+    nonisolated static func compress(_ urls: [URL], as format: ArchiveFormat, into destination: URL? = nil,
+                                     progress: ((Readout) -> Void)? = nil) throws -> URL {
         guard let first = urls.first else { throw Failure(message: "nothing to compress") }
         let parent = destination ?? first.deletingLastPathComponent()
         let base = urls.count == 1 ? first.lastPathComponent : "Archive"
         let out = uniqueURL(in: parent, name: base, ext: format.ext)
+
+        let meter: Meter? = progress != nil ? Meter(urls) : nil
+        let reporter = progress.map { startReporter(output: out, meter: meter, report: $0) }
+        defer { reporter?.cancel() }
 
         do {
             if format == .zip && urls.count == 1 && !CompressionSettings.crossPlatformZip {
@@ -189,11 +304,12 @@ enum Archiver {
                 let store = CompressionSettings.storeCompressed && isMostlyCompressed(urls)
                 let options = tarOptions(for: format, level: CompressionSettings.level, store: store)
                 do {
-                    try runTar(urls, as: format, to: out, options: options)
+                    try runTar(urls, as: format, to: out, options: options, meter: meter)
                 } catch {
                     if error is Cancelled || options.isEmpty { throw error }
                     try? FileManager.default.removeItem(at: out)
-                    try runTar(urls, as: format, to: out, options: [])
+                    meter?.reset()
+                    try runTar(urls, as: format, to: out, options: [], meter: meter)
                 }
             }
         } catch {
@@ -205,10 +321,13 @@ enum Archiver {
 
     // Razpakira v novo mapo z imenom arhiva. destination == nil: poleg arhiva.
     @discardableResult
-    nonisolated static func extract(_ archive: URL, into destination: URL?) throws -> URL {
+    nonisolated static func extract(_ archive: URL, into destination: URL?,
+                                    progress: ((Readout) -> Void)? = nil) throws -> URL {
         let parent = destination ?? archive.deletingLastPathComponent()
         let folder = uniqueURL(in: parent, name: baseName(ofArchive: archive.lastPathComponent), ext: nil)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        let reporter = progress.map { startReporter(output: nil, meter: nil, report: $0) }
+        defer { reporter?.cancel() }
         do {
             try run("/usr/bin/tar", ["-xf", archive.path, "-C", folder.path])
         } catch {
