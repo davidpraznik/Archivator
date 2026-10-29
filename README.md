@@ -82,6 +82,10 @@ The app does not use the App Sandbox. Detecting a file drag needs no special per
 
 Konverter uses **⇧ Shift** and **⌘ Command** while dragging. Archivator uses **⌥ Option** by default (changeable in Settings) and never reacts to Shift or Command, so both can run at the same time.
 
+## About
+
+I am a UX/UI and product designer. I made Archivator for my own needs, as a companion to [Konverter](https://github.com/davidpraznik/Konverter): the same wheel, the same way of working, but for compressing and extracting files. Many open source tools have helped me deliver my work over the years, so I am sharing this one publicly to give something back. It is free and MIT licensed. Bug reports and ideas are welcome in [Issues](https://github.com/davidpraznik/Archivator/issues).
+
 ## Third-party components
 
 - [Inter](https://rsms.me/inter/) (SIL Open Font License 1.1), interface typeface. The licence is included as `Inter-LICENSE.txt`.
